@@ -412,7 +412,9 @@ function pedidoClaude(e){
   'Regras:\n'+
   '1. Antes de qualquer clique, abra o perfil do membro (sem alterar nada) e mostre o plano: membro, cargos a tirar, cargos a pôr e novo apelido. Espere eu responder "ok".\n'+
   '2. Busque o membro em Configurações do servidor > Membros. Se aparecer mais de um resultado ou nenhum, pare e me pergunte.\n'+
-  '3. Pare e me pergunte se: o CPF do apelido atual for diferente do CPF deste pedido; o primeiro nome do pedido não aparecer no apelido atual; o membro tiver cargo acima do meu ou for eu mesmo.\n'+
+  (e.acao==='Ingresso'
+    ?'3. Ingresso: o apelido atual ainda pode não seguir o padrão, então não compare nome nem CPF. Pare e me pergunte se o membro tiver cargo acima do meu ou for eu mesmo.\n'
+    :'3. Pare e me pergunte se: o apelido atual tiver um CPF diferente do CPF deste pedido; o primeiro nome do pedido não aparecer no apelido atual; o membro tiver cargo acima do meu ou for eu mesmo.\n')+
   '4. Compare o perfil com o pedido. Cargo a pôr que ele já tem, cargo a tirar que ele não tem, ou apelido já igual: não mexa e me avise. Se nada precisar mudar, pare.\n'+
   '5. Se, depois da mudança, ele ficar com dois cargos de carreira (Agente, Investigador, Escrivão, Perícia), ou com ⭕ EXONERADO junto com outro cargo que não seja medalha, mostre o conflito no plano e pergunte.\n'+
   (e.acao==='Exoneração'?'6. Exoneração: liste no plano todos os cargos do perfil que não estão neste pedido (exceto medalhas, que ficam) e pergunte se também saem.\n':'6. Exoneração: não se aplica a este pedido.\n')+
