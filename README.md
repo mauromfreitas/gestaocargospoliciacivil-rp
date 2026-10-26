@@ -38,3 +38,17 @@ Abra `index.html` no navegador (ou publique pelo GitHub Pages). O estado e o reg
 ## Observação
 
 Automatizar contas de usuário vai contra os termos do Discord. Aplique um membro por vez, com conferência, e evite ações em lote.
+
+## Versão
+
+A versão aparece no topo da página e na primeira linha do pedido para o Claude (`[Gestor de Cargos DGP v1.4]`). Pelo GitHub Pages, a página compara a própria versão com `version.json` e mostra um aviso quando existe uma mais nova.
+
+Ao publicar uma mudança, suba a versão em `index.html` (`VERSION`) e em `version.json`.
+
+| Versão | Data | Mudanças |
+|---|---|---|
+| 1.4 | 26/10/2026 | Fluxos de exceção no pedido (regras 1 a 10), medalhas ficam na exoneração, CPF no pedido, indicador de versão |
+| 1.3 | 26/10/2026 | Regra para não repetir cargo ou apelido que já existe |
+| 1.2 | 26/10/2026 | Nomes exatos dos cargos do servidor |
+| 1.1 | 26/10/2026 | Campo "Membro no Discord" e botão "Copiar para o Claude" |
+| 1.0 | 26/10/2026 | Primeira versão |

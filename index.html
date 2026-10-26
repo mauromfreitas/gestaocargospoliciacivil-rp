@@ -36,6 +36,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:1
 .steps{display:flex;gap:6px;flex-wrap:wrap;font-family:var(--f-mono);font-size:12px}
 .steps span{border:1px solid rgba(255,255,255,.18);padding:3px 8px;border-radius:3px;color:var(--band-ink)}
 .steps b{color:var(--band-gold)}
+.ver{font-family:var(--f-mono);font-size:12px;color:var(--band-gold);border:1px solid var(--band-gold);border-radius:3px;padding:2px 8px;white-space:nowrap}
+.update{background:var(--warn-soft);color:var(--warn);border-bottom:1px solid var(--warn)}
+.update-in{max-width:1200px;margin:0 auto;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));font-weight:600}
 .wrap{max-width:1200px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:20px;align-items:start}
 @media (max-width:920px){.wrap{grid-template-columns:minmax(0,1fr)}}
 .col{display:flex;flex-direction:column;gap:16px;min-width:0}
@@ -108,9 +111,10 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
     <h1>Gestor de Cargos <span>· DGP</span></h1>
     <p>Polícia Civil · Jaguaré RP. Monte a movimentação aqui e aplique os cliques no Discord. Nada é alterado automaticamente.</p>
   </div>
-  <div class="steps"><span><b>1</b> Policial</span><span><b>2</b> Cargos atuais</span><span><b>3</b> Movimentação</span><span><b>4</b> Aplicar e registrar</span></div>
+  <div class="steps"><span class="ver" id="ver" title="Versão desta página"></span><span><b>1</b> Policial</span><span><b>2</b> Cargos atuais</span><span><b>3</b> Movimentação</span><span><b>4</b> Aplicar e registrar</span></div>
 </div></header>
 
+<div class="update" id="updateBar" hidden><div class="update-in">Há uma versão mais nova da ferramenta (<span id="newVer"></span>). Aperte Ctrl + F5 para carregar.</div></div>
 <main class="wrap">
   <div class="col">
     <section class="panel">
@@ -179,6 +183,8 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 
 <script>
 (function(){
+/* Ao publicar mudança: subir VERSION aqui e em version.json no repositório. */
+const VERSION='1.4', VERSION_DATE='26/10/2026';
 const ROLES=[], byId={};
 function add(id,name,group,o){const r=Object.assign({id:id,name:name,group:group},o||{});ROLES.push(r);byId[id]=r;return r}
 
@@ -408,7 +414,8 @@ function resumo(e){
 function pedidoClaude(e){
   const alvo=(state.membro||'').trim()||(state.nome||'').trim();
   const lista=function(a){return a.length?a.map(function(n){return '- '+n}).join('\n'):'- nenhum'};
-  return 'Aplique esta movimentação de cargos no servidor "Polícia Civil • Jaguaré RP" no Discord aberto neste navegador.\n\n'+
+  return '[Gestor de Cargos DGP v'+VERSION+']\n'+
+  'Aplique esta movimentação de cargos no servidor "Polícia Civil • Jaguaré RP" no Discord aberto neste navegador.\n\n'+
   'Regras:\n'+
   '1. Antes de qualquer clique, abra o perfil do membro (sem alterar nada) e mostre o plano: membro, cargos a tirar, cargos a pôr e novo apelido. Espere eu responder "ok".\n'+
   '2. Busque o membro em Configurações do servidor > Membros. Se aparecer mais de um resultado ou nenhum, pare e me pergunte.\n'+
@@ -535,6 +542,12 @@ $('novo').addEventListener('click',function(){
 });
 
 renderAll();
+document.getElementById('ver').textContent='v'+VERSION+' · '+VERSION_DATE;
+try{
+  fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(j){
+    if(j&&j.version&&j.version!==VERSION){document.getElementById('newVer').textContent='v'+j.version;document.getElementById('updateBar').hidden=false}
+  }).catch(function(){});
+}catch(e){}
 })();
 </script>
 </body>
