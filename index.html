@@ -273,7 +273,7 @@ function computeAfter(){
       if(p.disc==='advv')s.add('advv');
       else if(p.disc){['pad1','pad2','pad3'].forEach(function(x){s.delete(x)});s.add(p.disc)}
       break;
-    case 'exoneracao': s=new Set(['exon']);break;
+    case 'exoneracao': s=new Set(['exon']);state.atual.forEach(function(id){if(byId[id]&&byId[id].group==='medalhas')s.add(id)});break;
   }
   const aj=state.ajustes||{};
   Object.keys(aj).forEach(function(id){if(aj[id])s.add(id);else s.delete(id)});
@@ -323,7 +323,7 @@ function warnings(c){
   if(a.has('tat3')&&!a.has('tat2'))w.push('TAT-3 sem TAT-2: a progressão é TAT-1, TAT-2, TAT-3 (Cap. 4, Art. 2º).');
   if(a.has('tat2')&&!a.has('tat1'))w.push('TAT-2 sem TAT-1: a progressão é TAT-1, TAT-2, TAT-3 (Cap. 4, Art. 2º).');
   if(a.size&&!a.has('polcivil')&&!a.has('exon'))w.push('A nova situação está sem o cargo Polícia Civil.');
-  if(a.has('exon')&&a.size>1)w.push('Exonerado mantém só o cargo ⭕ EXONERADO. Há outros cargos marcados.');
+  if(a.has('exon')&&Array.from(a).some(function(id){return id!=='exon'&&byId[id].group!=='medalhas'}))w.push('Exonerado mantém só ⭕ EXONERADO e as medalhas. Há outros cargos marcados.');
   const cpf=(state.cpf||'').trim();
   if(cpf&&!/^\d{4}$/.test(cpf))w.push('O CPF não tem 4 dígitos. Confira antes de aplicar.');
   if(c.short)w.push('O apelido passou de 32 caracteres e foi encurtado.');
@@ -355,7 +355,7 @@ function renderParams(){
       h='<div class="field"><label for="pModo">Ação</label><select id="pModo">'+opt('afastar','Afastar das atividades',p.modo||'afastar')+opt('retorno','Retorno às atividades',p.modo||'afastar')+'</select></div>';break;
     case 'disciplina':
       h='<div class="field"><label for="pDisc">Medida</label><select id="pDisc">'+opt('','Escolha…',p.disc||'')+opt('advv','Advertência Verbal',p.disc)+opt('pad1','PAD 1/3',p.disc)+opt('pad2','PAD 2/3',p.disc)+opt('pad3','PAD 3/3',p.disc)+'</select></div><p>O PAD novo substitui o anterior. Registre a apuração da Corregedoria antes (Cap. 5, Art. 4º).</p>';break;
-    case 'exoneracao': h='<p>Todos os cargos saem e entra só <b>⭕ EXONERADO</b>. O apelido passa a <b>Exon. Nome - CPF</b>.</p>';break;
+    case 'exoneracao': h='<p>Todos os cargos saem, exceto as medalhas, e entra <b>⭕ EXONERADO</b>. O apelido passa a <b>Exon. Nome - CPF</b>. O Claude ainda lista cargos do perfil que não foram marcados aqui e pergunta se saem.</p>';break;
     case 'livre': h='<p>Abra <b>Nova situação</b> e marque ou desmarque o que quiser.</p>';break;
   }
   $('params').innerHTML=h;
@@ -410,16 +410,20 @@ function pedidoClaude(e){
   const lista=function(a){return a.length?a.map(function(n){return '- '+n}).join('\n'):'- nenhum'};
   return 'Aplique esta movimentação de cargos no servidor "Polícia Civil • Jaguaré RP" no Discord aberto neste navegador.\n\n'+
   'Regras:\n'+
-  '1. Antes de qualquer clique, mostre o plano (membro, cargos a tirar, cargos a pôr, novo apelido) e espere eu responder "ok".\n'+
-  '2. Encontre o membro em Configurações do servidor > Membros, pela busca. Se aparecer mais de um resultado ou nenhum, pare e me pergunte.\n'+
-  '3. Tire e ponha somente os cargos listados, um de cada vez. Nunca mexa em outros cargos, permissões, canais ou outros membros.\n'+
-  '4. Troque o apelido para exatamente o texto informado.\n'+
-  '5. No fim, abra o perfil do membro e me mostre os cargos e o apelido que ficaram. Se algo falhar (cargo não encontrado, sem permissão), me avise e não tente contornar.\n'+
-  '6. Um membro por vez. Não repita nem faça lotes sem eu pedir.\n'+
-  '7. Antes de alterar, abra o perfil do membro e compare com o pedido. Cargo a pôr que ele já tem, cargo a tirar que ele não tem, ou apelido já igual: não mexa e me avise. Se nada precisar mudar, pare e me diga.\n\n'+
+  '1. Antes de qualquer clique, abra o perfil do membro (sem alterar nada) e mostre o plano: membro, cargos a tirar, cargos a pôr e novo apelido. Espere eu responder "ok".\n'+
+  '2. Busque o membro em Configurações do servidor > Membros. Se aparecer mais de um resultado ou nenhum, pare e me pergunte.\n'+
+  '3. Pare e me pergunte se: o CPF do apelido atual for diferente do CPF deste pedido; o primeiro nome do pedido não aparecer no apelido atual; o membro tiver cargo acima do meu ou for eu mesmo.\n'+
+  '4. Compare o perfil com o pedido. Cargo a pôr que ele já tem, cargo a tirar que ele não tem, ou apelido já igual: não mexa e me avise. Se nada precisar mudar, pare.\n'+
+  '5. Se, depois da mudança, ele ficar com dois cargos de carreira (Agente, Investigador, Escrivão, Perícia), ou com ⭕ EXONERADO junto com outro cargo que não seja medalha, mostre o conflito no plano e pergunte.\n'+
+  (e.acao==='Exoneração'?'6. Exoneração: liste no plano todos os cargos do perfil que não estão neste pedido (exceto medalhas, que ficam) e pergunte se também saem.\n':'6. Exoneração: não se aplica a este pedido.\n')+
+  '7. Tire e ponha somente o que foi aprovado, um de cada vez. Troque o apelido para exatamente o texto informado. Nunca mexa em permissões, canais ou outros membros.\n'+
+  '8. Se algo falhar no meio (cargo não encontrado, sem permissão, Discord travou), pare, diga o que foi feito e o que faltou, e pergunte se continuo ou desfaço. Se o Discord pedir verificação (captcha), pare e me chame.\n'+
+  '9. No fim, abra o perfil e me mostre os cargos e o apelido que ficaram.\n'+
+  '10. Um membro por vez. Não repita nem faça lotes sem eu pedir.\n\n'+
   'Movimentação: '+e.acao+'\n'+
   'Membro (buscar por): '+(alvo||'não informado')+'\n'+
-  'Nome no RP: '+((state.nome||'').trim()||'não informado')+'\n\n'+
+  'Nome no RP: '+((state.nome||'').trim()||'não informado')+'\n'+
+  'CPF: '+((state.cpf||'').trim()||'não informado')+'\n\n'+
   'Cargos a tirar:\n'+lista(e.rem)+'\n\n'+
   'Cargos a pôr:\n'+lista(e.add)+'\n\n'+
   'Novo apelido (exato): '+e.nick;
