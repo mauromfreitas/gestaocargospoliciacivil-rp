@@ -141,7 +141,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
       <div class="legend" id="legend"></div>
       <div class="searchbar"><input type="text" id="busca" placeholder="Filtrar cargos (ex.: TAT, DEIC, Estágio)" autocomplete="off" aria-label="Filtrar cargos"></div>
       <div id="grid"></div>
-      <p class="note">Só aparecem cargos abaixo de Delegado Geral Adjunto, que são os que você consegue gerenciar. Lista lida do servidor em 26/10/2026.</p>
+      <p class="note">Só aparecem cargos abaixo de Delegado Geral Adjunto, que são os que você consegue gerenciar. Nomes conferidos com o servidor em 26/10/2026. Passe o mouse num cargo para ver o nome completo.</p>
     </section>
   </div>
 
@@ -182,6 +182,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 const ROLES=[], byId={};
 function add(id,name,group,o){const r=Object.assign({id:id,name:name,group:group},o||{});ROLES.push(r);byId[id]=r;return r}
 
+/* Nomes exatos lidos do servidor em 26/10/2026. "label" é só o rótulo curto na tela; "name" é o que vai para o Discord. */
 /* Gerais */
 add('polcivil','Polícia Civil','gerais');
 add('apoiador','Apoiador da Polícia Civil','gerais');
@@ -190,7 +191,7 @@ add('visitante','Visitante','gerais');
 add('exon','⭕ EXONERADO','gerais');
 
 /* Carreira */
-const CAREERS=[['esc','Escrivão','Esc.'],['invc','Investigador-Chefe','InvC.'],['inve','Investigador Classe Especial','InvE.'],['inv1','Investigador 1ª Classe','Inv1.'],['inv2','Investigador 2ª Classe','Inv2.'],['inv3','Investigador 3ª Classe','Inv3.'],['age','Agente Classe Especial','AgE.'],['ag1','Agente 1ª Classe','Ag1.'],['ag2','Agente 2ª Classe','Ag2.'],['ag3','Agente 3ª Classe','Ag3.'],['leg','Médico Legista','Leg.'],['per','Perito Criminal','Per.'],['fot','Fotógrafo Técnico Pericial','Fot.']];
+const CAREERS=[['esc','Escrivão','Esc.'],['invc','Investigador Chefe','InvC.'],['inve','Investigador de Classe Especial','InvE.'],['inv1','Investigador de 1º Classe','Inv1.'],['inv2','Investigador de 2º Classe','Inv2.'],['inv3','Investigador de 3º Classe','Inv3.'],['age','Agente Classe Especial','AgE.'],['ag1','Agente de 1º Classe','Ag1.'],['ag2','Agente de 2º Classe','Ag2.'],['ag3','Agente de 3º Classe','Ag3.'],['leg','Médico Legista','Leg.'],['per','Perito Criminal','Per.'],['fot','Fotógrafo Técnico Pericial','Fot.']];
 CAREERS.forEach(function(c){add(c[0],c[1],'carreira',{prefix:c[2],career:true})});
 const CAREER_IDS=CAREERS.map(function(c){return c[0]});
 
@@ -198,34 +199,45 @@ const CAREER_IDS=CAREERS.map(function(c){return c[0]});
 add('delpol','Delegado de Polícia','delegados');
 const DELEG=[['corregepol','CORREGEPOL'],['decap','DECAP'],['deic','DEIC'],['dhpp','DHPP'],['denarc','DENARC/DISE'],['cerco','CERCO'],['ger','GER'],['garra','GARRA'],['sat','SAT'],['goe','GOE'],['dopegarra','DOPE|GARRA']];
 DELEG.forEach(function(d){
-  add('dt_'+d[0],'Delegado Titular · '+d[1],'delegados',{dept:d[0],del:'T'});
-  add('da_'+d[0],'Delegado Adjunto · '+d[1],'delegados',{dept:d[0],del:'A'});
+  add('dt_'+d[0],'Delegado Titular - '+d[1],'delegados',{dept:d[0],del:'T'});
+  add('da_'+d[0],'Delegado Adjunto - '+d[1],'delegados',{dept:d[0],del:'A'});
 });
 
-/* Departamentos */
-const DEPTS=[['sapj','⚖️ Setor de Assistência Policial Judiciária',[]],['corregepol','CORREGEPOL',['Denúncias','Administrativo','Estágio']],['decap','DECAP',['Administrativo']],['deic','DEIC',['Administrativo','Investigativo','Estágio']],['dhpp','DHPP',['Administrativo','Estágio']],['denarc','DENARC/DISE',['Administrativo','Estágio']],['cerco','CERCO',['Administrativo','Investigativo','Estágio']],['ger','GER | DOPE DOE',['Administrativo','GER • 10','GER • 20','GER • 30','Estágio']],['garra','GARRA',['Administrativo','Investigativo','Estágio']],['goe','GOE',['Administrativo','Estágio']],['sat','SAT | DOPE DOE',['Administrativo','Piloto','Tripulante','Estágio Tripulante','Estágio']]];
+/* Departamentos: [id, rótulo curto, nome do cargo base, [[nome exato da subdivisão, rótulo curto]...]] */
+const DEPTS=[
+ ['sapj','Assistência Policial Judiciária','⚖️ Setor de Assistência Policial Judiciária',[]],
+ ['corregepol','CORREGEPOL','✧ CORREGEPOL • Corregedoria',[['Denúncias • CORREGEPOL','Denúncias'],['Administrativo • CORREGEPOL','Administrativo'],['Estágio • Corregepol','Estágio']]],
+ ['decap','DECAP','✧ DECAP • Departamento de Polícia Judiciária da Capital',[['Administrativo • DECAP','Administrativo']]],
+ ['deic','DEIC','✧ DEIC • Departamento Estadual de Investigações Criminais',[['Administrativo • DEIC','Administrativo'],['Investigativo • DEIC','Investigativo'],['Estágio • DEIC','Estágio']]],
+ ['dhpp','DHPP','✧ DHPP • Departamento Estadual de Homicídios e de Proteção à Pessoa',[['Administrativo • DHPP','Administrativo'],['Estágio • DHPP','Estágio']]],
+ ['denarc','DENARC/DISE','✧ DENARC/DISE• Departamento Estadual de Prevenção e Repressão ao Narcotráfico',[['Administrativo • DENARC/DISE','Administrativo'],['Estágio • DENARC/DISE','Estágio']]],
+ ['cerco','CERCO','✧ CERCO • Corpo Especial de Repressão ao Crime Organizado',[['Administrativo • CERCO','Administrativo'],['Investigativo • CERCO','Investigativo'],['CERCO • Estágio','Estágio']]],
+ ['ger','GER','✧ GER • Grupo Especial de Reação | DOPE DOE',[['Administrativo • GER | DOPE DOE','Administrativo'],['GER • 10','GER • 10'],['GER • 20','GER • 20'],['GER • 30','GER • 30'],['Estágio • GER | DOPE DOE','Estágio']]],
+ ['garra','GARRA','✧ GARRA • Grupo Armado de Repressão a Roubos e Assaltos',[['Administrativo • GARRA','Administrativo'],['Investigativo GARRA','Investigativo'],['Estágio • GARRA','Estágio']]],
+ ['goe','GOE','✧ GOE • Grupo Operações Especiais',[['Administrativo • GOE','Administrativo'],['Estágio • GOE','Estágio']]],
+ ['sat','SAT','✧ SAT • Serviço Aerotático | DOPE DOE',[['Administrativo • SAT | DOPE DOE','Administrativo'],['Piloto • SAT | DOPE DOE','Piloto'],['Tripulante • SAT | DOPE DOE','Tripulante'],['Estágio Tripulante • SAT | DOPE DOE','Estágio Tripulante'],['Estágio • SAT | DOPE DOE','Estágio']]]
+];
 DEPTS.forEach(function(d){
-  add(d[0],d[1],'deps',{dept:d[0],base:true});
-  const short=d[1].split(' |')[0];
-  d[2].forEach(function(s,i){add(d[0]+'_'+i,short+' · '+s,'deps',{dept:d[0],sub:s})});
+  add(d[0],d[2],'deps',{dept:d[0],base:true,label:d[1]});
+  d[3].forEach(function(s,i){add(d[0]+'_'+i,s[0],'deps',{dept:d[0],sub:s[1],label:d[1]+' · '+s[1]})});
 });
 
 /* ACADEPOL */
-add('diretor','Diretor de Sessão','acadepol');
-add('vice','Vice-Diretor de Sessão','acadepol');
+add('diretor','Diretor de Sessão • ACADEPOL','acadepol',{label:'Diretor de Sessão'});
+add('vice','Vice-Diretor de Sessão • ACADEPOL','acadepol',{label:'Vice-Diretor de Sessão'});
 add('instrutor','Instrutor','acadepol');
 add('academia','Academia de Polícia Dr. Coriolano Nogueira Cobra','acadepol');
 add('acadepol','Acadepol','acadepol');
 
 /* Cursos */
-[['c_ipc','Curso de IPC'],['c_cipr','Curso CIPR'],['c_dir','Curso de Direção Ofensiva/Defensiva'],['c_bopc','BOPC'],['tat1','TAT-1'],['tat2','TAT-2'],['tat3','TAT-3'],['c_cqb','Curso de CQB'],['c_pilp','Piloto Pelicano'],['c_atp','Atirador Pelicano'],['c_inv','Curso de Investigação'],['c_drone','Operador de Drone'],['c_atd','Atirador Designado'],['c_crise','Gerenciamento de Crises'],['c_cdc','Controle de Distúrbio Civil'],['c_iau','Incursão em Áreas Urbanas']].forEach(function(c){add(c[0],c[1],'cursos')});
+[['c_ipc','Curso de IPC'],['c_cipr','Curso CIPR'],['c_dir','Curso de Direção Ofensiva/Defensiva'],['c_bopc','BOPC'],['tat1','TAT-1'],['tat2','TAT-2'],['tat3','TAT-3'],['c_cqb','Curso de CQB'],['c_pilp','Piloto Pelicano'],['c_atp','Atirador Pelicano'],['c_inv','Curso de Investigação'],['c_drone','Curso de Operador de Drone'],['c_atd','Curso de Atirador Designado'],['c_crise','Curso de Gerenciamento de Crises'],['c_cdc','Curso de Controle de Distúrbio Civil'],['c_iau','Curso de Incursão em Áreas Urbanas']].forEach(function(c){add(c[0],c[1],'cursos')});
 
 /* Gestão, status, disciplina, medalhas */
-[['dirdope','Diretor DOPE-DOE'],['dirrh','Diretor RH-DGP'],['rh','RH'],['dadg','DADG'],['gdg','GDG – Gabinete do Delegado Geral'],['rh2','Recursos Humanos']].forEach(function(c){add(c[0],c[1],'gestao')});
+[['dirdope','DIRETOR DOPE - DOE'],['dirrh','Diretor RH - DGP'],['rh','RH'],['dadg','DADG - Departamento de Administração da Delegacia Geral de Polícia','DADG'],['gdg','GDG - Gabinete do Delegado Geral'],['rh2','Recursos Humanos']].forEach(function(c){add(c[0],c[1],'gestao',c[2]?{label:c[2]}:null)});
 add('afast','Afastado das atividades','status');
 add('aguard','Aguardando Transferência','status');
 [['advv','Advertência Verbal'],['pad1','PAD 1/3'],['pad2','PAD 2/3'],['pad3','PAD 3/3']].forEach(function(c){add(c[0],c[1],'disc')});
-[['m_cor','“Dr. Coriolano Nogueira Cobra”'],['m_cent','Centenário da ACADEPOL'],['m_jt','“Jorge Tibiriçá”'],['m_aer','Serviço Aerotático']].forEach(function(c){add(c[0],c[1],'medalhas')});
+[['m_cor','Medalha "Dr. Coriolano Nogueira Cobra"'],['m_cent','Medalha Centenário da Academia de Polícia Dr. Coriolano Nogueira Cobra','Medalha Centenário da ACADEPOL'],['m_jt','Medalha "Jorge Tibiriçá"'],['m_aer','Medalha do Serviço Aerotático']].forEach(function(c){add(c[0],c[1],'medalhas',c[2]?{label:c[2]}:null)});
 
 const GROUPS=[['gerais','Gerais'],['carreira','Carreira (um por vez)'],['delegados','Delegados'],['deps','Departamentos e subdivisões'],['acadepol','ACADEPOL'],['cursos','Cursos'],['gestao','Gestão DGP'],['status','Status'],['disc','Disciplina'],['medalhas','Medalhas']];
 const ORDER={};ROLES.forEach(function(r,i){ORDER[r.id]=i});
@@ -353,8 +365,8 @@ function chipClass(id,c){
   const was=c.atual.has(id),is=c.after.has(id);
   if(was&&is)return 'chip keep';if(!was&&is)return 'chip add';if(was&&!is)return 'chip rem';return 'chip';
 }
-function match(r){return !filtro||r.name.toLowerCase().indexOf(filtro)>=0}
-function chip(r,c){return '<button type="button" class="'+chipClass(r.id,c)+(r.base?' base':'')+'" data-role="'+r.id+'">'+esc(r.name)+'</button>'}
+function match(r){return !filtro||(r.name+' '+(r.label||'')).toLowerCase().indexOf(filtro)>=0}
+function chip(r,c){return '<button type="button" class="'+chipClass(r.id,c)+(r.base?' base':'')+'" data-role="'+r.id+'" title="'+esc(r.name)+'">'+esc(r.label||r.name)+'</button>'}
 function renderGrid(c){
   $('tabAtual').setAttribute('aria-selected',state.tab==='atual');
   $('tabNova').setAttribute('aria-selected',state.tab==='nova');
