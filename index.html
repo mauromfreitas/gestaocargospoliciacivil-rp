@@ -102,6 +102,19 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .entry .meta{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:4px;font-weight:600;font-size:13px;z-index:20}
 .note{font-size:12px;color:var(--muted);margin:10px 0 0}
+textarea{font:inherit;font-family:var(--f-mono);font-size:13px;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:8px 10px;width:100%;resize:vertical}
+textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pblock{display:flex;flex-direction:column;gap:8px}
+.pblock + .pblock{border-top:1px dashed var(--line);padding-top:10px}
+.qno{font-family:var(--f-mono);color:var(--accent)}
+.qact{display:flex;gap:6px}
+.entry.editing{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.pill{font-size:12px;font-weight:600;border-radius:3px;padding:3px 8px;align-self:flex-start}
+.st-wait{background:var(--surface-2);color:var(--muted)}
+.st-pend{background:var(--warn-soft);color:var(--warn)}
+.st-fail{background:var(--rem-soft);color:var(--rem)}
+.btn:disabled{opacity:.5;cursor:default}
+.headtags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 @media (prefers-reduced-motion:no-preference){.chip,.btn,.pk button{transition:background .12s,border-color .12s}}
 </style>
 </head>
@@ -132,6 +145,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 
     <section class="panel">
       <h2><span class="n">2</span> Movimentação</h2>
+      <p class="note" style="margin:-6px 0 10px">Pode combinar mais de uma, como Promoção + Curso concluído. Exoneração e Ajuste livre ficam sozinhas.</p>
       <div class="pk" id="pacotes" role="group" aria-label="Tipo de movimentação"></div>
       <div class="params" id="params"></div>
     </section>
@@ -152,6 +166,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
   <aside class="col res">
     <section class="panel">
       <h2>Resultado</h2>
+      <div class="headtags"><span class="tag" id="acaoTag"></span><span class="tag" id="editTag" hidden></span></div>
       <div class="lbl" style="margin-bottom:4px">Novo apelido</div>
       <div class="nick" id="nick"></div>
       <div class="meter" id="meter"><div class="bar"><div id="meterBar"></div></div><span id="meterTxt"></span></div>
@@ -165,10 +180,22 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
       <div class="field" style="margin-top:14px"><label for="resp">Responsável</label><input type="text" id="resp" placeholder="Seu nome no RP" autocomplete="off"></div>
       <div class="btns">
         <button class="btn pri" id="copyClaude">Copiar para o Claude</button>
+        <button class="btn pri" id="addLote">Adicionar ao lote</button>
+        <button class="btn" id="cancelEdit" hidden>Cancelar edição</button>
         <button class="btn" id="registrar">Registrar</button>
         <button class="btn" id="copyResumo">Copiar resumo</button>
         <button class="btn" id="novo">Novo policial</button>
       </div>
+    </section>
+
+    <section class="panel" id="lotePanel">
+      <h2>Lote <span class="n" id="qCount">0/5</span></h2>
+      <div id="dupBox"></div>
+      <div class="log" id="queue"></div>
+      <div class="btns"><button class="btn pri" id="copyLote">Copiar lote para o Claude</button></div>
+      <div class="field" style="margin-top:14px"><label for="resultado">Colar resultado do Claude</label><textarea id="resultado" rows="4" placeholder="#1 REALIZADO&#10;#2 PENDENTE: CPF diferente"></textarea></div>
+      <div class="btns"><button class="btn" id="aplicarRes">Atualizar fila</button></div>
+      <p class="note">Uma linha por pessoa, até 5 por lote. Realizados saem da fila e vão para o Registro; pendentes e falhas ficam para corrigir e reenviar.</p>
     </section>
 
     <section class="panel">
@@ -184,7 +211,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 <script>
 (function(){
 /* Ao publicar mudança: subir VERSION aqui e em version.json no repositório. */
-const VERSION='1.4', VERSION_DATE='26/10/2026';
+const VERSION='1.5', VERSION_DATE='26/10/2026';
 const ROLES=[], byId={};
 function add(id,name,group,o){const r=Object.assign({id:id,name:name,group:group},o||{});ROLES.push(r);byId[id]=r;return r}
 
@@ -249,38 +276,55 @@ const GROUPS=[['gerais','Gerais'],['carreira','Carreira (um por vez)'],['delegad
 const ORDER={};ROLES.forEach(function(r,i){ORDER[r.id]=i});
 
 const PACOTES=[['ingresso','Ingresso'],['promocao','Promoção'],['transferencia','Transferência'],['curso','Curso concluído'],['afastamento','Afastamento'],['disciplina','Medida disciplinar'],['exoneracao','Exoneração'],['livre','Ajuste livre']];
+const EXCLUSIVE=['exoneracao','livre'];
+const PARAM_KEYS={promocao:['career'],transferencia:['from','to'],curso:['cursos'],afastamento:['modo'],disciplina:['disc']};
 const PREFIXES=['Del.','Adj.','DG.','DGA.','Esc.','InvC.','InvE.','Inv1.','Inv2.','Inv3.','AgE.','Ag1.','Ag2.','Ag3.','Leg.','Per.','Fot.','Al.','Exon.'];
+const LOTE_MAX=5;
 
 /* Estado */
-const SKEY='gcdgp.state.v1', LKEY='gcdgp.log.v1';
+const SKEY='gcdgp.state.v1', LKEY='gcdgp.log.v1', QKEY='gcdgp.queue.v1';
 function load(k,def){try{const v=localStorage.getItem(k);return v?JSON.parse(v):def}catch(e){return def}}
 function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
-function exampleState(){return{example:true,nome:'João Pereira Santos',cpf:'1234',prefixo:'',atual:['polcivil','ag2','deic','deic_1','tat1','tat2'],pacote:'promocao',params:{career:'inv3'},ajustes:{},tab:'atual'}}
-let state=load(SKEY,null)||exampleState();
-let log=load(LKEY,[]);
-if(!Array.isArray(log))log=[];
-let filtro='';
+function clone(o){return JSON.parse(JSON.stringify(o))}
+function union(a,b){const out=(a||[]).slice();(b||[]).forEach(function(x){if(out.indexOf(x)<0)out.push(x)});return out}
+function exampleState(){return{example:true,membro:'',nome:'João Pereira Santos',cpf:'1234',prefixo:'',atual:['polcivil','ag2','deic','deic_1','tat1','tat2'],pacotes:['promocao','curso'],params:{career:'inv3',cursos:['c_cqb']},ajustes:{},tab:'atual'}}
+function normalize(st){
+  st=st||{};
+  if(!Array.isArray(st.pacotes))st.pacotes=st.pacote?[st.pacote]:['livre'];
+  delete st.pacote;
+  st.params=st.params||{};st.ajustes=st.ajustes||{};st.atual=st.atual||[];
+  return st;
+}
+let state=normalize(load(SKEY,null)||exampleState());
+let log=load(LKEY,[]);if(!Array.isArray(log))log=[];
+let queue=load(QKEY,null);if(!queue||!Array.isArray(queue.items))queue={seq:0,items:[]};
+let filtro='',dup=null,rmArm=null;
 
 const $=function(id){return document.getElementById(id)};
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function sortIds(a){return a.slice().sort(function(x,y){return ORDER[x]-ORDER[y]})}
+function has(pk){return state.pacotes.indexOf(pk)>=0}
+function withState(st,fn){const o=state;state=st;try{return fn()}finally{state=o}}
 
 function computeAfter(){
   let s=new Set(state.atual);const p=state.params||{};
-  switch(state.pacote){
-    case 'ingresso': s.add('polcivil');s.delete('exon');s.delete('visitante');break;
-    case 'promocao': CAREER_IDS.forEach(function(c){s.delete(c)}); if(p.career)s.add(p.career); break;
-    case 'transferencia':
-      if(p.from)ROLES.forEach(function(r){if(r.dept===p.from)s.delete(r.id)});
-      if(p.to)s.add(p.to); s.delete('aguard'); break;
-    case 'curso': (p.cursos||[]).forEach(function(id){s.add(id)});break;
-    case 'afastamento': if(p.modo==='retorno')s.delete('afast');else s.add('afast');break;
-    case 'disciplina':
-      if(p.disc==='advv')s.add('advv');
-      else if(p.disc){['pad1','pad2','pad3'].forEach(function(x){s.delete(x)});s.add(p.disc)}
-      break;
-    case 'exoneracao': s=new Set(['exon']);state.atual.forEach(function(id){if(byId[id]&&byId[id].group==='medalhas')s.add(id)});break;
-  }
+  PACOTES.forEach(function(pk){
+    if(!has(pk[0]))return;
+    switch(pk[0]){
+      case 'ingresso': s.add('polcivil');s.delete('exon');s.delete('visitante');break;
+      case 'promocao': CAREER_IDS.forEach(function(c){s.delete(c)}); if(p.career)s.add(p.career); break;
+      case 'transferencia':
+        if(p.from)ROLES.forEach(function(r){if(r.dept===p.from)s.delete(r.id)});
+        if(p.to)s.add(p.to); s.delete('aguard'); break;
+      case 'curso': (p.cursos||[]).forEach(function(id){s.add(id)});break;
+      case 'afastamento': if(p.modo==='retorno')s.delete('afast');else s.add('afast');break;
+      case 'disciplina':
+        if(p.disc==='advv')s.add('advv');
+        else if(p.disc){['pad1','pad2','pad3'].forEach(function(x){s.delete(x)});s.add(p.disc)}
+        break;
+      case 'exoneracao': s=new Set(['exon']);state.atual.forEach(function(id){if(byId[id]&&byId[id].group==='medalhas')s.add(id)});break;
+    }
+  });
   const aj=state.ajustes||{};
   Object.keys(aj).forEach(function(id){if(aj[id])s.add(id);else s.delete(id)});
   return s;
@@ -318,13 +362,16 @@ function current(){
   const n=buildNick(pre,state.nome||'',(state.cpf||'').trim());
   return{atual:atual,after:after,rem:rem,add:addl,prefix:pre,nick:n.nick,short:n.short};
 }
+function acaoLabel(pks){return PACOTES.filter(function(p){return pks.indexOf(p[0])>=0}).map(function(p){return p[1]}).join(' + ')||'Ajuste livre'}
 
 function warnings(c){
   const w=[],a=c.after,p=state.params||{};
-  if(state.pacote==='ingresso')w.push('Antes de setar: o candidato não pode estar em outro grupo, legal ou ilegal, e precisa ter cumprido 3 dias desde a saída. Também não pode ter personagem no ilegal (Regulamento, Cap. 7, Art. 1º).');
-  if(state.pacote==='promocao'&&['advv','pad1','pad2','pad3'].some(function(x){return c.atual.has(x)}))w.push('Este policial tem medida disciplinar em andamento e não pode ser promovido (Cap. 7, Art. 5º, §3º).');
-  if(state.pacote==='promocao'&&!p.career)w.push('Escolha o novo cargo de carreira.');
-  if(state.pacote==='transferencia'&&(!p.from||!p.to))w.push('Escolha o departamento de origem e o de destino.');
+  if(has('ingresso'))w.push('Antes de setar: o candidato não pode estar em outro grupo, legal ou ilegal, e precisa ter cumprido 3 dias desde a saída. Também não pode ter personagem no ilegal (Regulamento, Cap. 7, Art. 1º).');
+  if(has('promocao')&&['advv','pad1','pad2','pad3'].some(function(x){return c.atual.has(x)}))w.push('Este policial tem medida disciplinar em andamento e não pode ser promovido (Cap. 7, Art. 5º, §3º).');
+  if(has('promocao')&&has('disciplina'))w.push('Promoção junto com medida disciplinar: confira se a promoção ainda vale (Cap. 7, Art. 5º, §3º).');
+  if(has('promocao')&&!p.career)w.push('Escolha o novo cargo de carreira.');
+  if(has('transferencia')&&(!p.from||!p.to))w.push('Escolha o departamento de origem e o de destino.');
+  if(has('curso')&&!(p.cursos||[]).length)w.push('Escolha pelo menos um curso.');
   if((a.has('academia')||a.has('acadepol'))&&(a.has('tat2')||a.has('tat3')))w.push('Integrantes da ACADEPOL não podem ter TAT-2 nem TAT-3 (Cap. 4, Art. 1º, §3º).');
   if(a.has('tat3')&&!a.has('tat2'))w.push('TAT-3 sem TAT-2: a progressão é TAT-1, TAT-2, TAT-3 (Cap. 4, Art. 2º).');
   if(a.has('tat2')&&!a.has('tat1'))w.push('TAT-2 sem TAT-1: a progressão é TAT-1, TAT-2, TAT-3 (Cap. 4, Art. 2º).');
@@ -338,33 +385,30 @@ function warnings(c){
 
 /* Render */
 function renderPrefixSelect(){
-  const sel=$('prefixo');
-  sel.innerHTML='<option value="">Automático</option>'+PREFIXES.map(function(p){return '<option'+(state.prefixo===p?' selected':'')+'>'+p+'</option>'}).join('');
+  $('prefixo').innerHTML='<option value="">Automático</option>'+PREFIXES.map(function(p){return '<option'+(state.prefixo===p?' selected':'')+'>'+p+'</option>'}).join('');
 }
 function renderPacotes(){
-  $('pacotes').innerHTML=PACOTES.map(function(p){return '<button type="button" data-pk="'+p[0]+'" aria-pressed="'+(state.pacote===p[0])+'">'+p[1]+'</button>'}).join('');
+  $('pacotes').innerHTML=PACOTES.map(function(p){return '<button type="button" data-pk="'+p[0]+'" aria-pressed="'+has(p[0])+'">'+p[1]+'</button>'}).join('');
 }
 function opt(v,l,sel){return '<option value="'+v+'"'+(sel===v?' selected':'')+'>'+esc(l)+'</option>'}
-function renderParams(){
-  const p=state.params||{};let h='';
-  switch(state.pacote){
-    case 'ingresso': h='<p>O cargo Polícia Civil entra automaticamente. Abra <b>Nova situação</b> e marque os demais cargos que o novo membro recebe.</p>';break;
-    case 'promocao':
-      h='<div class="field"><label for="pCareer">Novo cargo de carreira</label><select id="pCareer">'+opt('','Escolha…',p.career||'')+CAREERS.map(function(c){return opt(c[0],c[1],p.career)}).join('')+'</select></div><p>O cargo de carreira atual sai e o novo entra.</p>';break;
-    case 'transferencia':
-      const deps=DEPTS.map(function(d){return d});
-      h='<div class="row"><div class="field"><label for="pFrom">Sai de</label><select id="pFrom">'+opt('','Escolha…',p.from||'')+deps.map(function(d){return opt(d[0],d[1],p.from)}).join('')+'</select></div><div class="field"><label for="pTo">Vai para</label><select id="pTo">'+opt('','Escolha…',p.to||'')+deps.map(function(d){return opt(d[0],d[1],p.to)}).join('')+'</select></div></div><p>Saem o departamento de origem, as subdivisões e os cargos de delegado dele. Entra só o departamento de destino; marque as subdivisões em Nova situação.</p>';break;
-    case 'curso':
-      const cs=ROLES.filter(function(r){return r.group==='cursos'});const sel=p.cursos||[];
-      h='<div class="lbl">Cursos concluídos</div><div class="chips">'+cs.map(function(r){const has=state.atual.indexOf(r.id)>=0;return '<button type="button" class="chip'+(sel.indexOf(r.id)>=0?' add':'')+'" data-curso="'+r.id+'"'+(has?' disabled title="Já possui"':'')+' style="'+(has?'opacity:.45;cursor:default':'')+'">'+esc(r.name)+'</button>'}).join('')+'</div>';break;
-    case 'afastamento':
-      h='<div class="field"><label for="pModo">Ação</label><select id="pModo">'+opt('afastar','Afastar das atividades',p.modo||'afastar')+opt('retorno','Retorno às atividades',p.modo||'afastar')+'</select></div>';break;
-    case 'disciplina':
-      h='<div class="field"><label for="pDisc">Medida</label><select id="pDisc">'+opt('','Escolha…',p.disc||'')+opt('advv','Advertência Verbal',p.disc)+opt('pad1','PAD 1/3',p.disc)+opt('pad2','PAD 2/3',p.disc)+opt('pad3','PAD 3/3',p.disc)+'</select></div><p>O PAD novo substitui o anterior. Registre a apuração da Corregedoria antes (Cap. 5, Art. 4º).</p>';break;
-    case 'exoneracao': h='<p>Todos os cargos saem, exceto as medalhas, e entra <b>⭕ EXONERADO</b>. O apelido passa a <b>Exon. Nome - CPF</b>. O Claude ainda lista cargos do perfil que não foram marcados aqui e pergunta se saem.</p>';break;
-    case 'livre': h='<p>Abra <b>Nova situação</b> e marque ou desmarque o que quiser.</p>';break;
+function paramsFor(pk,p){
+  if(pk==='ingresso')return '<p>O cargo Polícia Civil entra automaticamente. Abra <b>Nova situação</b> e marque os demais cargos que o novo membro recebe.</p>';
+  if(pk==='promocao')return '<div class="field"><label for="pCareer">Novo cargo de carreira</label><select id="pCareer">'+opt('','Escolha…',p.career||'')+CAREERS.map(function(c){return opt(c[0],c[1],p.career)}).join('')+'</select></div><p>O cargo de carreira atual sai e o novo entra.</p>';
+  if(pk==='transferencia')return '<div class="row"><div class="field"><label for="pFrom">Sai de</label><select id="pFrom">'+opt('','Escolha…',p.from||'')+DEPTS.map(function(d){return opt(d[0],d[1],p.from)}).join('')+'</select></div><div class="field"><label for="pTo">Vai para</label><select id="pTo">'+opt('','Escolha…',p.to||'')+DEPTS.map(function(d){return opt(d[0],d[1],p.to)}).join('')+'</select></div></div><p>Saem o departamento de origem, as subdivisões e os cargos de delegado dele. Entra só o departamento de destino; marque as subdivisões em Nova situação.</p>';
+  if(pk==='curso'){
+    const sel=p.cursos||[];
+    return '<div class="chips">'+ROLES.filter(function(r){return r.group==='cursos'}).map(function(r){const hasIt=state.atual.indexOf(r.id)>=0;return '<button type="button" class="chip'+(sel.indexOf(r.id)>=0?' add':'')+'" data-curso="'+r.id+'"'+(hasIt?' disabled title="Já possui" style="opacity:.45;cursor:default"':'')+'>'+esc(r.name)+'</button>'}).join('')+'</div>';
   }
-  $('params').innerHTML=h;
+  if(pk==='afastamento')return '<div class="field"><label for="pModo">Ação</label><select id="pModo">'+opt('afastar','Afastar das atividades',p.modo||'afastar')+opt('retorno','Retorno às atividades',p.modo||'afastar')+'</select></div>';
+  if(pk==='disciplina')return '<div class="field"><label for="pDisc">Medida</label><select id="pDisc">'+opt('','Escolha…',p.disc||'')+opt('advv','Advertência Verbal',p.disc)+opt('pad1','PAD 1/3',p.disc)+opt('pad2','PAD 2/3',p.disc)+opt('pad3','PAD 3/3',p.disc)+'</select></div><p>O PAD novo substitui o anterior. Registre a apuração da Corregedoria antes (Cap. 5, Art. 4º).</p>';
+  if(pk==='exoneracao')return '<p>Todos os cargos saem, exceto as medalhas, e entra <b>⭕ EXONERADO</b>. O apelido passa a <b>Exon. Nome - CPF</b>. O Claude ainda lista cargos do perfil que não foram marcados aqui e pergunta se saem.</p>';
+  return '<p>Abra <b>Nova situação</b> e marque ou desmarque o que quiser.</p>';
+}
+function renderParams(){
+  const p=state.params||{};
+  $('params').innerHTML=PACOTES.filter(function(pk){return has(pk[0])}).map(function(pk){
+    return '<div class="pblock"><div class="lbl">'+pk[1]+'</div>'+paramsFor(pk[0],p)+'</div>';
+  }).join('');
 }
 function chipClass(id,c){
   if(state.tab==='atual')return c.atual.has(id)?'chip on':'chip';
@@ -406,41 +450,84 @@ function renderResult(c){
   $('listAdd').innerHTML=c.add.length?c.add.map(li).join(''):'<li class="empty">Nada a pôr</li>';
   $('nRem').textContent=c.rem.length;$('nAdd').textContent=c.add.length;
   $('warns').innerHTML=warnings(c).map(function(w){return '<div class="warn">'+esc(w)+'</div>'}).join('');
+  $('acaoTag').textContent=acaoLabel(state.pacotes);
+  $('editTag').hidden=!state.editing;$('editTag').textContent='Editando #'+state.editing;
+  $('addLote').textContent=state.editing?'Atualizar #'+state.editing+' no lote':'Adicionar ao lote';
+  $('cancelEdit').hidden=!state.editing;
 }
 function fmtDate(ts){const d=new Date(ts);function z(n){return String(n).padStart(2,'0')}return z(d.getDate())+'/'+z(d.getMonth()+1)+'/'+d.getFullYear()+' '+z(d.getHours())+':'+z(d.getMinutes())}
 function resumo(e){
   return '**Movimentação de cargos · '+e.acao+'**\nPolicial: `'+e.nick+'`\nRetirar: '+(e.rem.length?e.rem.join(', '):'nenhum')+'\nAdicionar: '+(e.add.length?e.add.join(', '):'nenhum')+'\nResponsável: '+(e.resp||'não informado')+'\nData: '+fmtDate(e.ts);
 }
+function entry(){
+  const c=current();
+  return{ts:Date.now(),acao:acaoLabel(state.pacotes),pk:state.pacotes.slice(),nick:c.nick,rem:c.rem.map(function(i){return byId[i].name}),add:c.add.map(function(i){return byId[i].name}),resp:state.resp||'',membro:(state.membro||'').trim(),nome:(state.nome||'').trim(),cpf:(state.cpf||'').trim()};
+}
+function lista(a){return a.length?a.map(function(n){return '- '+n}).join('\n'):'- nenhum'}
+function blocoDados(e,prefixo){
+  return (prefixo||'')+'Movimentação: '+e.acao+'\n'+
+  'Membro (buscar por): '+(e.membro||e.nome||'não informado')+'\n'+
+  'Nome no RP: '+(e.nome||'não informado')+'\n'+
+  'CPF: '+(e.cpf||'não informado')+'\n'+
+  'Cargos a tirar:\n'+lista(e.rem)+'\n'+
+  'Cargos a pôr:\n'+lista(e.add)+'\n'+
+  'Novo apelido (exato): '+e.nick;
+}
 function pedidoClaude(e){
-  const alvo=(state.membro||'').trim()||(state.nome||'').trim();
-  const lista=function(a){return a.length?a.map(function(n){return '- '+n}).join('\n'):'- nenhum'};
+  const ing=e.pk.indexOf('ingresso')>=0,exo=e.pk.indexOf('exoneracao')>=0;
   return '[Gestor de Cargos DGP v'+VERSION+']\n'+
   'Aplique esta movimentação de cargos no servidor "Polícia Civil • Jaguaré RP" no Discord aberto neste navegador.\n\n'+
   'Regras:\n'+
   '1. Antes de qualquer clique, abra o perfil do membro (sem alterar nada) e mostre o plano: membro, cargos a tirar, cargos a pôr e novo apelido. Espere eu responder "ok".\n'+
   '2. Busque o membro em Configurações do servidor > Membros. Se aparecer mais de um resultado ou nenhum, pare e me pergunte.\n'+
-  (e.acao==='Ingresso'
+  (ing
     ?'3. Ingresso: o apelido atual ainda pode não seguir o padrão, então não compare nome nem CPF. Pare e me pergunte se o membro tiver cargo acima do meu ou for eu mesmo.\n'
     :'3. Pare e me pergunte se: o apelido atual tiver um CPF diferente do CPF deste pedido; o primeiro nome do pedido não aparecer no apelido atual; o membro tiver cargo acima do meu ou for eu mesmo.\n')+
   '4. Compare o perfil com o pedido. Cargo a pôr que ele já tem, cargo a tirar que ele não tem, ou apelido já igual: não mexa e me avise. Se nada precisar mudar, pare.\n'+
   '5. Se, depois da mudança, ele ficar com dois cargos de carreira (Agente, Investigador, Escrivão, Perícia), ou com ⭕ EXONERADO junto com outro cargo que não seja medalha, mostre o conflito no plano e pergunte.\n'+
-  (e.acao==='Exoneração'?'6. Exoneração: liste no plano todos os cargos do perfil que não estão neste pedido (exceto medalhas, que ficam) e pergunte se também saem.\n':'6. Exoneração: não se aplica a este pedido.\n')+
+  (exo?'6. Exoneração: liste no plano todos os cargos do perfil que não estão neste pedido (exceto medalhas, que ficam) e pergunte se também saem.\n':'6. Exoneração: não se aplica a este pedido.\n')+
   '7. Tire e ponha somente o que foi aprovado, um de cada vez. Troque o apelido para exatamente o texto informado. Nunca mexa em permissões, canais ou outros membros.\n'+
   '8. Se algo falhar no meio (cargo não encontrado, sem permissão, Discord travou), pare, diga o que foi feito e o que faltou, e pergunte se continuo ou desfaço. Se o Discord pedir verificação (captcha), pare e me chame.\n'+
   '9. No fim, abra o perfil e me mostre os cargos e o apelido que ficaram.\n'+
   '10. Um membro por vez. Não repita nem faça lotes sem eu pedir.\n\n'+
-  'Movimentação: '+e.acao+'\n'+
-  'Membro (buscar por): '+(alvo||'não informado')+'\n'+
-  'Nome no RP: '+((state.nome||'').trim()||'não informado')+'\n'+
-  'CPF: '+((state.cpf||'').trim()||'não informado')+'\n\n'+
-  'Cargos a tirar:\n'+lista(e.rem)+'\n\n'+
-  'Cargos a pôr:\n'+lista(e.add)+'\n\n'+
-  'Novo apelido (exato): '+e.nick;
+  blocoDados(e);
+}
+function pedidoLote(){
+  const its=queue.items;
+  const ing=its.some(function(i){return i.pk.indexOf('ingresso')>=0}),exo=its.some(function(i){return i.pk.indexOf('exoneracao')>=0});
+  return '[Gestor de Cargos DGP v'+VERSION+' · LOTE de '+its.length+']\n'+
+  'Aplique este lote de movimentações de cargos no servidor "Polícia Civil • Jaguaré RP" no Discord aberto neste navegador. Cada item é um membro diferente.\n\n'+
+  'Regras do lote:\n'+
+  '1. Primeiro, sem alterar nada, busque e abra o perfil de cada membro da lista (Configurações do servidor > Membros). Monte um plano único com, para cada item: membro encontrado, cargos a tirar, cargos a pôr, novo apelido e exceções. Espere eu responder "ok".\n'+
+  '2. Exceções deixam o item PENDENTE, com o motivo, e ele não é executado: mais de um resultado ou nenhum na busca; '+(ing?'(exceto itens de Ingresso, que não comparam nome nem CPF) ':'')+'CPF do apelido atual diferente do CPF do item; primeiro nome do item que não aparece no apelido atual; membro com cargo acima do meu ou que seja eu mesmo; mudança que deixaria o membro com dois cargos de carreira ou com ⭕ EXONERADO junto com outro cargo que não seja medalha.\n'+
+  '3. Compare cada perfil com o item. Cargo a pôr que ele já tem, cargo a tirar que ele não tem, ou apelido já igual: não mexa e cite no plano. Se nada precisar mudar no item, ele fica SEM MUDANÇA.\n'+
+  (exo?'4. Itens de Exoneração: liste no plano todos os cargos do perfil que não estão no item (exceto medalhas, que ficam). Meu "ok" vale para tirá-los também, salvo se eu disser o contrário.\n':'4. Exoneração: não há itens de exoneração neste lote.\n')+
+  '5. Depois do "ok", execute só os itens aprovados, na ordem, um membro de cada vez. Tire e ponha um cargo por vez e troque o apelido para exatamente o texto do item. Espere cerca de 20 segundos antes de passar para o próximo membro.\n'+
+  '6. Nunca mexa em permissões, canais ou membros fora desta lista. Não repita itens.\n'+
+  '7. Se um item falhar no meio (cargo não encontrado, sem permissão, Discord travou), não tente de novo: marque como FALHOU dizendo o que foi feito e o que faltou, e siga para o próximo. Se o Discord pedir verificação (captcha), pare o lote inteiro e me chame; os itens não iniciados ficam PENDENTE.\n'+
+  '8. No fim, abra o perfil de cada membro executado e confira. Depois me entregue o relatório num bloco de código, uma linha por item, exatamente neste formato:\n'+
+  '#1 REALIZADO\n#2 SEM MUDANÇA\n#3 PENDENTE: motivo\n#4 FALHOU: o que foi feito e o que faltou\n\n'+
+  'Itens:\n\n'+
+  its.map(function(it){return blocoDados(it,'#'+it.no+'\n')}).join('\n\n');
 }
 function renderLog(){
   $('log').innerHTML=log.length?log.map(function(e,i){
     return '<div class="entry"><div class="top"><span class="tag">'+esc(e.acao)+'</span><button class="btn sm" data-logcopy="'+i+'">Copiar</button></div><code>'+esc(e.nick)+'</code><div class="meta">'+fmtDate(e.ts)+' · −'+e.rem.length+' / +'+e.add.length+(e.resp?' · '+esc(e.resp):'')+'</div></div>';
   }).join(''):'<p class="empty">Nenhuma movimentação registrada ainda.</p>';
+}
+const STATUS={pendente:['Pendente','st-pend'],falhou:['Falhou','st-fail']};
+function renderQueue(){
+  $('qCount').textContent=queue.items.length+'/'+LOTE_MAX;
+  $('queue').innerHTML=queue.items.length?queue.items.map(function(it){
+    const st=it.motivo?(STATUS[it.status]||STATUS.pendente):null;
+    return '<div class="entry'+(state.editing===it.no?' editing':'')+'"><div class="top"><span><b class="qno">#'+it.no+'</b> <span class="tag">'+esc(it.acao)+'</span></span>'+
+      '<span class="qact"><button class="btn sm" data-qedit="'+it.no+'">Editar</button><button class="btn sm" data-qrm="'+it.no+'">'+(rmArm===it.no?'Confirmar':'Remover')+'</button></span></div>'+
+      '<code>'+esc(it.nick)+'</code><div class="meta">'+esc(it.membro||'sem membro no Discord')+' · −'+it.rem.length+' / +'+it.add.length+'</div>'+
+      (st?'<div class="pill '+st[1]+'">'+st[0]+': '+esc(it.motivo)+'</div>':'<div class="pill st-wait">Aguardando envio</div>')+'</div>';
+  }).join(''):'<p class="empty">Nenhum membro no lote. Monte uma movimentação e clique em Adicionar ao lote.</p>';
+  const d=dup&&queue.items.filter(function(i){return i.no===dup})[0];
+  $('dupBox').innerHTML=d?'<div class="warn">Este membro já está no lote como <b>#'+d.no+'</b>. Juntar as movimentações num item só?<div class="btns"><button class="btn sm" id="dupJoin">Juntar com #'+d.no+'</button><button class="btn sm" id="dupCancel">Cancelar</button></div></div>':'';
+  $('copyLote').disabled=!queue.items.length;
 }
 function render(){
   $('exTag').hidden=!state.example;
@@ -451,17 +538,43 @@ function render(){
 function renderAll(){
   $('membro').value=state.membro||'';
   $('nome').value=state.nome||'';$('cpf').value=state.cpf||'';$('resp').value=state.resp||'';
-  renderPrefixSelect();renderPacotes();renderParams();renderLog();render();
+  renderPrefixSelect();renderPacotes();renderParams();renderLog();renderQueue();render();
 }
 
 /* Copiar */
 let toastT;
-function toast(msg){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){t.hidden=true},1600)}
+function toast(msg){const t=$('toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(function(){t.hidden=true},2200)}
 function copy(text,ok){
   function fallback(){
     try{const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();const r=document.execCommand('copy');document.body.removeChild(ta);toast(r?ok:'Não foi possível copiar. Selecione o texto manualmente.')}catch(e){toast('Não foi possível copiar. Selecione o texto manualmente.')}
   }
   try{navigator.clipboard.writeText(text).then(function(){toast(ok)},fallback)}catch(e){fallback()}
+}
+
+/* Lote */
+function saveQ(){save(QKEY,queue)}
+function itemKey(m,n,c){m=(m||'').trim().toLowerCase();return m?'m:'+m:'n:'+(n||'').trim().toLowerCase()+'|'+(c||'').trim()}
+function snapshot(){const s=clone(state);delete s.resp;delete s.tab;delete s.editing;delete s.example;return s}
+function fillItem(it){
+  const e=entry();
+  it.snap=snapshot();it.acao=e.acao;it.pk=e.pk;it.nick=e.nick;it.rem=e.rem;it.add=e.add;it.membro=e.membro;it.nome=e.nome;it.cpf=e.cpf;it.status='pendente';it.motivo='';
+  return it;
+}
+function findItem(no){return queue.items.filter(function(i){return i.no===no})[0]}
+function mergeSnap(a,b){
+  const m=clone(a);
+  ['membro','nome','cpf','prefixo'].forEach(function(k){if(String(b[k]||'').trim())m[k]=b[k]});
+  let pk=PACOTES.map(function(p){return p[0]}).filter(function(k){return a.pacotes.indexOf(k)>=0||b.pacotes.indexOf(k)>=0});
+  if(pk.indexOf('exoneracao')>=0)pk=['exoneracao'];else{pk=pk.filter(function(k){return k!=='livre'});if(!pk.length)pk=['livre']}
+  m.pacotes=pk;
+  m.params=Object.assign({},a.params,b.params);
+  const cs=union((a.params||{}).cursos,(b.params||{}).cursos);if(cs.length)m.params.cursos=cs;
+  m.ajustes=Object.assign({},a.ajustes,b.ajustes);
+  let at=union(a.atual,b.atual);
+  const bCareer=(b.atual||[]).filter(function(x){return byId[x]&&byId[x].career})[0];
+  if(bCareer)at=at.filter(function(x){return !(byId[x]&&byId[x].career)||x===bCareer});
+  m.atual=at;
+  return m;
 }
 
 /* Eventos */
@@ -476,9 +589,17 @@ $('tabAtual').addEventListener('click',function(){state.tab='atual';render()});
 $('tabNova').addEventListener('click',function(){state.tab='nova';render()});
 $('pacotes').addEventListener('click',function(e){
   const b=e.target.closest('[data-pk]');if(!b)return;
-  state.pacote=b.dataset.pk;state.params={};state.ajustes={};
-  if(state.pacote==='ingresso'||state.pacote==='livre')state.tab='nova';
-  renderPacotes();renderParams();render();
+  const k=b.dataset.pk;
+  if(EXCLUSIVE.indexOf(k)>=0){state.pacotes=[k]}
+  else{
+    const l=state.pacotes.filter(function(x){return EXCLUSIVE.indexOf(x)<0});
+    const i=l.indexOf(k);if(i>=0)l.splice(i,1);else l.push(k);
+    state.pacotes=l.length?l:['livre'];
+  }
+  Object.keys(PARAM_KEYS).forEach(function(pk){if(!has(pk))PARAM_KEYS[pk].forEach(function(key){delete state.params[key]})});
+  if(k==='exoneracao')state.ajustes={};
+  if((k==='ingresso'||k==='livre')&&has(k))state.tab='nova';
+  touch();renderPacotes();renderParams();render();
 });
 $('params').addEventListener('change',function(e){
   const p=state.params=state.params||{};
@@ -502,7 +623,7 @@ $('grid').addEventListener('click',function(e){
     const i=state.atual.indexOf(id);
     if(i>=0)state.atual.splice(i,1);
     else{if(byId[id].career)state.atual=state.atual.filter(function(x){return !byId[x].career});state.atual.push(id)}
-    if(state.pacote==='curso')renderParams();
+    if(has('curso'))renderParams();
   }else{
     const after=computeAfter(),want=!after.has(id);
     state.ajustes[id]=want;
@@ -512,14 +633,10 @@ $('grid').addEventListener('click',function(e){
 });
 document.querySelector('.diff').addEventListener('click',function(e){const b=e.target.closest('[data-copy]');if(b)copy(b.dataset.copy,'Nome do cargo copiado')});
 $('copyNick').addEventListener('click',function(){const c=current();if(c.nick)copy(c.nick,'Apelido copiado')});
-function entry(){
-  const c=current();const pk=PACOTES.filter(function(p){return p[0]===state.pacote})[0];
-  return{ts:Date.now(),acao:pk?pk[1]:'Ajuste',nick:c.nick,rem:c.rem.map(function(i){return byId[i].name}),add:c.add.map(function(i){return byId[i].name}),resp:state.resp||''};
-}
 $('copyClaude').addEventListener('click',function(){
   const e=entry();
   if(!e.nick){toast('Preencha o nome do policial');return}
-  if(!(state.membro||'').trim())toast('Dica: preencha "Membro no Discord" para a busca não errar');
+  if(!e.membro)toast('Dica: preencha "Membro no Discord" para a busca não errar');
   copy(pedidoClaude(e),'Pedido copiado. Cole no Claude do Edge');
 });
 $('copyResumo').addEventListener('click',function(){copy(resumo(entry()),'Resumo copiado')});
@@ -529,6 +646,76 @@ $('registrar').addEventListener('click',function(){
   if(!e.rem.length&&!e.add.length){toast('Não há mudança de cargos para registrar');return}
   log.unshift(e);log=log.slice(0,100);save(LKEY,log);renderLog();toast('Movimentação registrada');
 });
+$('addLote').addEventListener('click',function(){
+  const e=entry();
+  if(!e.nick){toast('Preencha o nome do policial');return}
+  if(state.editing){
+    const it=findItem(state.editing);
+    if(it){fillItem(it);toast('#'+it.no+' atualizado no lote')}
+    state.editing=null;
+  }else{
+    const k=itemKey(e.membro,e.nome,e.cpf);
+    const ex=queue.items.filter(function(i){return itemKey(i.membro,i.nome,i.cpf)===k})[0];
+    if(ex){dup=ex.no;renderQueue();toast('Este membro já está no lote');return}
+    if(queue.items.length>=LOTE_MAX){toast('O lote já tem '+LOTE_MAX+' membros. Envie ou remova um antes.');return}
+    queue.seq+=1;queue.items.push(fillItem({no:queue.seq}));
+    toast('Adicionado ao lote como #'+queue.seq);
+  }
+  if(!e.membro)toast('Adicionado. Dica: preencha "Membro no Discord" para a busca não errar');
+  saveQ();renderQueue();render();
+});
+$('cancelEdit').addEventListener('click',function(){state.editing=null;renderQueue();render()});
+$('lotePanel').addEventListener('click',function(e){
+  const t=e.target;
+  if(t.id==='dupCancel'){dup=null;renderQueue();return}
+  if(t.id==='dupJoin'){
+    const it=findItem(dup);dup=null;if(!it){renderQueue();return}
+    const merged=mergeSnap(normalize(clone(it.snap)),snapshot());
+    state=Object.assign(normalize(merged),{resp:state.resp,tab:'nova',editing:it.no});
+    fillItem(it);saveQ();renderAll();toast('Juntado com #'+it.no+'. Confira em Nova situação.');return;
+  }
+  const ed=t.closest('[data-qedit]');
+  if(ed){const it=findItem(+ed.dataset.qedit);if(!it)return;state=Object.assign(normalize(clone(it.snap)),{resp:state.resp,tab:'atual',editing:it.no});dup=null;renderAll();toast('Editando #'+it.no);return}
+  const rm=t.closest('[data-qrm]');
+  if(rm){
+    const no=+rm.dataset.qrm;
+    if(rmArm!==no){rmArm=no;renderQueue();setTimeout(function(){if(rmArm===no){rmArm=null;renderQueue()}},3000);return}
+    rmArm=null;queue.items=queue.items.filter(function(i){return i.no!==no});
+    if(state.editing===no)state.editing=null;
+    if(!queue.items.length)queue.seq=0;
+    saveQ();renderQueue();render();toast('#'+no+' removido do lote');
+  }
+});
+$('copyLote').addEventListener('click',function(){
+  if(!queue.items.length)return;
+  if(queue.items.some(function(i){return !i.membro}))toast('Há item sem "Membro no Discord". A busca pode errar.');
+  copy(pedidoLote(),'Lote copiado ('+queue.items.length+'). Cole no Claude do Edge');
+});
+$('aplicarRes').addEventListener('click',function(){
+  const re=/#\s*(\d+)\D{0,8}?(REALIZADO|SEM MUDAN[ÇC]A|PENDENTE|FALHOU)\s*[:\-–—]?\s*(.*)$/i;
+  let ok=0,sem=0,pend=0,fail=0,unk=0;
+  $('resultado').value.split(/\r?\n/).forEach(function(line){
+    const m=line.match(re);if(!m)return;
+    const it=findItem(+m[1]);if(!it){unk++;return}
+    const st=m[2].toUpperCase();
+    if(st==='REALIZADO'||st.indexOf('SEM MUDAN')===0){
+      const semM=st!=='REALIZADO';
+      log.unshift({ts:Date.now(),acao:it.acao+(semM?' (sem mudança)':''),nick:it.nick,rem:semM?[]:it.rem,add:semM?[]:it.add,resp:state.resp||''});
+      queue.items=queue.items.filter(function(i){return i!==it});
+      if(state.editing===it.no)state.editing=null;
+      if(semM)sem++;else ok++;
+    }else{
+      it.status=st==='FALHOU'?'falhou':'pendente';it.motivo=(m[3]||'').trim()||'sem motivo informado';
+      if(st==='FALHOU')fail++;else pend++;
+    }
+  });
+  if(!ok&&!sem&&!pend&&!fail&&!unk){toast('Não encontrei linhas no formato "#1 REALIZADO".');return}
+  if(!queue.items.length)queue.seq=0;
+  log=log.slice(0,100);save(LKEY,log);saveQ();$('resultado').value='';
+  renderLog();renderQueue();render();
+  const parts=[];if(ok)parts.push(ok+' realizado'+(ok>1?'s':''));if(sem)parts.push(sem+' sem mudança');if(pend)parts.push(pend+' pendente'+(pend>1?'s':''));if(fail)parts.push(fail+' com falha');if(unk)parts.push(unk+' número'+(unk>1?'s':'')+' fora do lote');
+  toast('Fila atualizada: '+parts.join(', '));
+});
 $('log').addEventListener('click',function(e){const b=e.target.closest('[data-logcopy]');if(b)copy(resumo(log[+b.dataset.logcopy]),'Resumo copiado')});
 let limparArm=false,limparT;
 $('limparLog').addEventListener('click',function(e){
@@ -537,8 +724,8 @@ $('limparLog').addEventListener('click',function(e){
 });
 $('novo').addEventListener('click',function(){
   const resp=state.resp;
-  state={example:false,membro:'',nome:'',cpf:'',prefixo:'',atual:[],pacote:'ingresso',params:{},ajustes:{},tab:'atual',resp:resp};
-  renderAll();$('nome').focus();
+  state=normalize({example:false,membro:'',nome:'',cpf:'',prefixo:'',atual:[],pacotes:['ingresso'],params:{},ajustes:{},tab:'atual',resp:resp});
+  dup=null;renderAll();$('nome').focus();
 });
 
 renderAll();

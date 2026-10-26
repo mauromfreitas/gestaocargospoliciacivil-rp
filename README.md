@@ -12,7 +12,11 @@ A página não altera nada no Discord. Ela monta a movimentação e entrega:
 
 ## Movimentações
 
-Ingresso, promoção, transferência, curso concluído, afastamento/retorno, medida disciplinar, exoneração e ajuste livre.
+Ingresso, promoção, transferência, curso concluído, afastamento/retorno, medida disciplinar, exoneração e ajuste livre. Dá para combinar várias na mesma pessoa; exoneração e ajuste livre ficam sozinhas.
+
+## Lote
+
+Até 5 membros por lote, uma linha por pessoa. O Claude confere todos os perfis, mostra um plano único e executa com pausa de cerca de 20 segundos entre membros. O relatório (`#1 REALIZADO`, `#2 PENDENTE: motivo`…) é colado de volta na ferramenta: realizados vão para o Registro, pendentes e falhas ficam na fila.
 
 ## Prefixos de apelido
 
@@ -41,12 +45,13 @@ Automatizar contas de usuário vai contra os termos do Discord. Aplique um membr
 
 ## Versão
 
-A versão aparece no topo da página e na primeira linha do pedido para o Claude (`[Gestor de Cargos DGP v1.4]`). Pelo GitHub Pages, a página compara a própria versão com `version.json` e mostra um aviso quando existe uma mais nova.
+A versão aparece no topo da página e na primeira linha do pedido para o Claude (`[Gestor de Cargos DGP v1.5]`). Pelo GitHub Pages, a página compara a própria versão com `version.json` e mostra um aviso quando existe uma mais nova.
 
 Ao publicar uma mudança, suba a versão em `index.html` (`VERSION`) e em `version.json`.
 
 | Versão | Data | Mudanças |
 |---|---|---|
+| 1.5 | 26/10/2026 | Movimentações combinadas (ex.: Promoção + Curso) e lote de até 5 membros com fila, status e retorno do resultado do Claude |
 | 1.4 | 26/10/2026 | Fluxos de exceção no pedido (regras 1 a 10), medalhas ficam na exoneração, CPF no pedido, indicador de versão |
 | 1.3 | 26/10/2026 | Regra para não repetir cargo ou apelido que já existe |
 | 1.2 | 26/10/2026 | Nomes exatos dos cargos do servidor |
