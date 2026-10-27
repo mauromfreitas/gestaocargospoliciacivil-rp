@@ -214,7 +214,7 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <script>
 (function(){
 /* Ao publicar mudança: subir VERSION aqui e em version.json no repositório. */
-const VERSION='1.5.1', VERSION_DATE='27/10/2026';
+const VERSION='1.5.2', VERSION_DATE='27/10/2026';
 const ROLES=[], byId={};
 function add(id,name,group,o){const r=Object.assign({id:id,name:name,group:group},o||{});ROLES.push(r);byId[id]=r;return r}
 
@@ -489,7 +489,7 @@ function pedidoClaude(e){
   '4. Compare o perfil com o pedido. Cargo a pôr que ele já tem, cargo a tirar que ele não tem, ou apelido já igual: não mexa e me avise. Se nada precisar mudar, pare.\n'+
   '5. Se, depois da mudança, ele ficar com dois cargos de carreira (Agente, Investigador, Escrivão, Perícia), ou com ⭕ EXONERADO junto com outro cargo que não seja medalha, mostre o conflito no plano e pergunte.\n'+
   (exo?'6. Exoneração: liste no plano todos os cargos do perfil que não estão neste pedido (exceto medalhas, que ficam) e pergunte se também saem.\n':'6. Exoneração: não se aplica a este pedido.\n')+
-  '7. Tire e ponha somente o que foi aprovado, um de cada vez. Troque o apelido para exatamente o texto informado. Nunca mexa em permissões, canais ou outros membros.\n'+
+  '7. Tire e ponha somente o que foi aprovado, um de cada vez. Ao adicionar um cargo, clique no resultado com o nome exatamente igual ao da lista, nunca no primeiro resultado da busca (ex.: buscar "Polícia Civil" também mostra "Polícia Civil • Jaguaré RP"). Troque o apelido para exatamente o texto informado e confira o campo antes de salvar. Nunca mexa em permissões, canais ou outros membros.\n'+
   '8. Se algo falhar no meio (cargo não encontrado, sem permissão, Discord travou), pare, diga o que foi feito e o que faltou, e pergunte se continuo ou desfaço. Se o Discord pedir verificação (captcha), pare e me chame.\n'+
   '9. No fim, abra o perfil e me mostre os cargos e o apelido que ficaram.\n'+
   '10. Um membro por vez. Não repita nem faça lotes sem eu pedir.\n\n'+
@@ -505,7 +505,7 @@ function pedidoLote(){
   '2. Exceções deixam o item PENDENTE, com o motivo, e ele não é executado: mais de um resultado ou nenhum na busca; '+(ing?'(exceto itens de Ingresso, que não comparam nome nem CPF) ':'')+'CPF do apelido atual diferente do CPF do item; primeiro nome do item que não aparece no apelido atual; membro com cargo acima do meu ou que seja eu mesmo; mudança que deixaria o membro com dois cargos de carreira ou com ⭕ EXONERADO junto com outro cargo que não seja medalha.\n'+
   '3. Compare cada perfil com o item. Cargo a pôr que ele já tem, cargo a tirar que ele não tem, ou apelido já igual: não mexa e cite no plano. Se nada precisar mudar no item, ele fica SEM MUDANÇA.\n'+
   (exo?'4. Itens de Exoneração: liste no plano todos os cargos do perfil que não estão no item (exceto medalhas, que ficam). Meu "ok" vale para tirá-los também, salvo se eu disser o contrário.\n':'4. Exoneração: não há itens de exoneração neste lote.\n')+
-  '5. Depois do "ok", execute só os itens aprovados, na ordem, um membro de cada vez. Tire e ponha um cargo por vez e troque o apelido para exatamente o texto do item. Espere cerca de 20 segundos antes de passar para o próximo membro.\n'+
+  '5. Depois do "ok", execute só os itens aprovados, na ordem, um membro de cada vez. Tire e ponha um cargo por vez; ao adicionar, clique no resultado com o nome exatamente igual ao do item, nunca no primeiro resultado da busca (ex.: buscar "Polícia Civil" também mostra "Polícia Civil • Jaguaré RP"). Troque o apelido para exatamente o texto do item e confira o campo antes de salvar. Espere cerca de 20 segundos antes de passar para o próximo membro.\n'+
   '6. Nunca mexa em permissões, canais ou membros fora desta lista. Não repita itens.\n'+
   '7. Se um item falhar no meio (cargo não encontrado, sem permissão, Discord travou), não tente de novo: marque como FALHOU dizendo o que foi feito e o que faltou, e siga para o próximo. Se o Discord pedir verificação (captcha), pare o lote inteiro e me chame; os itens não iniciados ficam PENDENTE.\n'+
   '8. No fim, abra o perfil de cada membro executado e confira. Depois me entregue o relatório num bloco de código, uma linha por item, exatamente neste formato:\n'+
