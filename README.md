@@ -45,12 +45,13 @@ Automatizar contas de usuário vai contra os termos do Discord. Aplique um membr
 
 ## Versão
 
-A versão aparece no topo da página e na primeira linha do pedido para o Claude (`[Gestor de Cargos DGP v1.5]`). Pelo GitHub Pages, a página compara a própria versão com `version.json` e mostra um aviso quando existe uma mais nova.
+A versão aparece no topo da página e na primeira linha do pedido para o Claude (`[Gestor de Cargos DGP v1.5.1]`). Pelo GitHub Pages, a página compara a própria versão com `version.json` e mostra um aviso quando existe uma mais nova.
 
 Ao publicar uma mudança, suba a versão em `index.html` (`VERSION`) e em `version.json`.
 
 | Versão | Data | Mudanças |
 |---|---|---|
+| 1.5.1 | 27/10/2026 | Correções: etiquetas escondidas apareciam no GitHub Pages; espaço vazio no campo da Promoção |
 | 1.5 | 26/10/2026 | Movimentações combinadas (ex.: Promoção + Curso) e lote de até 5 membros com fila, status e retorno do resultado do Claude |
 | 1.4 | 26/10/2026 | Fluxos de exceção no pedido (regras 1 a 10), medalhas ficam na exoneração, CPF no pedido, indicador de versão |
 | 1.3 | 26/10/2026 | Regra para não repetir cargo ou apelido que já existe |

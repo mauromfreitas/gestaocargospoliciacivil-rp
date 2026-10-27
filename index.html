@@ -27,6 +27,7 @@
   --accent:#E3B23C; --accent-ink:#14171B; --accent-soft:#3A3018; --band:#08090B; --band-ink:#E7E9EC; --band-gold:#E3B23C;
   --add:#5CC98A; --add-soft:#16301F; --rem:#F08A82; --rem-soft:#3A1A18; --warn:#E8B95A; --warn-soft:#33290F; color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5}
 .band{background:var(--band);color:var(--band-ink)}
 .band-in{max-width:1200px;margin:0 auto;padding-block:20px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
@@ -105,6 +106,8 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 textarea{font:inherit;font-family:var(--f-mono);font-size:13px;color:var(--ink);background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:8px 10px;width:100%;resize:vertical}
 textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .pblock{display:flex;flex-direction:column;gap:8px}
+.params .field{flex:0 0 auto}
+.params .row .field{flex:1 1 180px}
 .pblock + .pblock{border-top:1px dashed var(--line);padding-top:10px}
 .qno{font-family:var(--f-mono);color:var(--accent)}
 .qact{display:flex;gap:6px}
@@ -211,7 +214,7 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <script>
 (function(){
 /* Ao publicar mudança: subir VERSION aqui e em version.json no repositório. */
-const VERSION='1.5', VERSION_DATE='26/10/2026';
+const VERSION='1.5.1', VERSION_DATE='27/10/2026';
 const ROLES=[], byId={};
 function add(id,name,group,o){const r=Object.assign({id:id,name:name,group:group},o||{});ROLES.push(r);byId[id]=r;return r}
 
